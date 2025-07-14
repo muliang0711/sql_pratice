@@ -1,72 +1,104 @@
 1. 
-create or replace show time_of_last_order (v-CustomerNumber in number) 
-AS 
-    v_last_order_date    DATE;
-    v_days_difference    NUMBER;
-    v_months_difference  NUMBER;
-begin 
-	select max(order_date) 
-	into v_last_order_date 
-	from orders o
-	where o.customer_number = v-CustomerNumber ;
+CREATE OR REPLACE PROCEDURE show_time_of_last_order (v_CustomerNumber IN NUMBER)
+AS
+    v_last_order_date      DATE;
+    v_days_difference      NUMBER;
+    v_months_difference    NUMBER;
 
-	IF v_last_order_date is null then 
-		dbms_output.put_line('customer' || v-CutomerNumber || ' has not make any order yet ') ;
-		return ; 
-	END IF ;
+    customer_has_no_order EXCEPTION;
+    PRAGMA EXCEPTION_INIT(customer_has_no_order, -20001);
+BEGIN
+    SELECT MAX(order_date)
+    INTO v_last_order_date
+    FROM orders o
+    WHERE o.customer_number = v_CustomerNumber;
 
-	// print out last order date 
-	dbms_output.put_line('last order make by ' || v_last_order_date) ; 
-	
-	// calculate the days difference : current date - v-last-order-date 
-	v_days_difference := trunc(SYSDATE - v_last_order_date) ;
-	v_months_difference := FLOOR(v_days_differebce / 30 ) ; 
-	// validate is >30 days or <30 dyas then print days / months difference
-	// if days difference > 30 : monthes else : days  
+    IF v_last_order_date IS NULL THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Customer ' || v_CustomerNumber || ' has not made any order yet.');
+    END IF;
 
-	if v_days_difference > 30 then 
-		dbms.output.put_line('last order make by' || v_days_difference);
-	ELSE  
-		dbms.output.put.line('last order make by ' || v_months_differnce) ; 
-	END IF ; 
-END 
+    -- Print last order date
+    DBMS_OUTPUT.PUT_LINE('Last order made on: ' || TO_CHAR(v_last_order_date, 'YYYY-MM-DD'));
+
+    -- Calculate the days and months difference
+    v_days_difference := TRUNC(SYSDATE - v_last_order_date);
+    v_months_difference := FLOOR(v_days_difference / 30);
+
+    -- Print based on days/months difference
+    IF v_days_difference > 30 THEN
+        DBMS_OUTPUT.PUT_LINE('Last order was made ' || v_months_difference || ' month(s) ago.');
+    ELSE
+        DBMS_OUTPUT.PUT_LINE('Last order was made ' || v_days_difference || ' day(s) ago.');
+    END IF;
+
+EXCEPTION
+    WHEN customer_has_no_order THEN
+        DBMS_OUTPUT.PUT_LINE(SQLERRM);
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Unexpected error: ' || SQLERRM);
+END;
+/
 
 2. 
-create or replace process_discount_claim (order_no , productCode)
-AS 
-	v_days_difference 
-	v_lowest_price 
-	v-product-buy-price
-	v-buy-price
-	v-price-after-apply-discount 
-begin 
-	select order_make_date , buy_price from 
-	into v-order-make-date , v-buy-price
-	from orders o
-	where o.order no = order_no ;
+CREATE OR REPLACE PROCEDURE process_discount_claim (
+    v_order_no    IN NUMBER,
+    v_productCode IN VARCHAR2
+)
+AS
+    v_order_date              DATE;
+    v_buy_price               NUMBER;
+    v_product_buy_price       NUMBER;
+    v_days_difference         NUMBER;
+    v_lowest_price            NUMBER;
+    v_price_after_discount    NUMBER;
 
-	select product_buy_price 
-	into v-product-buy-price 
-	from product p 
-	where p.productcode = productCode ;
+    invalid_order EXCEPTION;
+    PRAGMA EXCEPTION_INIT(invalid_order, -20002);
 
-	// if the order_no make date is > 30 days return 
-	v_days_difference = TRUNC(SYSDATE - v-order-make-date) ;
-	IF v_days_difference > 30 then 
-		return ;
-	ELSE 
-	// if the number after apply discount not lower then the product buy price : discount valid else return ;
-		v-lowest-price = v-product-buy-price + (0.05 * v-product-buy-price) ;
-		v-price-after-apply-discount = v-buy-price + ( 0.05 * v-buy-price ) ;
-	 
-		IF v-price-after-apply-discount > v-lowest-price then 
-			return ; 
-		ELSE 
-			upadate orders 
-			set  buy_price = v-price-after-apply-discount 
-			where order_no = order_no 
-		END IF ; 
-	END IF ; 
-END  
+BEGIN
+    -- Get order date and buy price
+    SELECT o.order_date, o.buy_price
+    INTO v_order_date, v_buy_price
+    FROM orders o
+    WHERE o.order_no = v_order_no;
+
+    -- Get current product buy price
+    SELECT p.product_buy_price
+    INTO v_product_buy_price
+    FROM product p
+    WHERE p.productCode = v_productCode;
+
+    -- Calculate days since order
+    v_days_difference := TRUNC(SYSDATE - v_order_date);
+
+    IF v_days_difference > 30 THEN
+        RAISE_APPLICATION_ERROR(-20002, 'Order is too old for discount claim.');
+    ELSE
+        -- Calculate threshold and discounted price
+        v_lowest_price := v_product_buy_price + (0.05 * v_product_buy_price);
+        v_price_after_discount := v_buy_price - (0.05 * v_buy_price);
+
+        IF v_price_after_discount >= v_lowest_price THEN
+            -- Valid discount, apply it
+            UPDATE orders
+            SET buy_price = v_price_after_discount
+            WHERE order_no = v_order_no;
+
+            DBMS_OUTPUT.PUT_LINE('Discount applied. New price: ' || v_price_after_discount);
+        ELSE
+            DBMS_OUTPUT.PUT_LINE('Discount rejected: price too low.');
+        END IF;
+    END IF;
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        DBMS_OUTPUT.PUT_LINE('Order or product not found.');
+    WHEN invalid_order THEN
+        DBMS_OUTPUT.PUT_LINE(SQLERRM);
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Unexpected error: ' || SQLERRM);
+END;
+/
+
 
 // need to consider add raise_application_error , default exception , custom expectiom , progma expection_init
