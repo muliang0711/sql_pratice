@@ -101,4 +101,11 @@ END;
 /
 
 
-// need to consider add raise_application_error , default exception , custom expectiom , progma expection_init
+-- need to consider add raise_application_error , default exception , custom expectiom , progma expection_init 
+-- when done the report for assg we need to format our ouput by line size , else (rpad , lpad )
+Text Align	LPAD, RPAD, SUBSTR, CONCAT, `
+Number Format	TO_CHAR, ROUND, TRUNC
+Date Format	TO_CHAR(date), SYSDATE, TRUNC
+Clean Strings	TRIM, REPLACE, INSTR
+Display Control	CHR(10), CHR(9), Aliases, IF/CASE
+Structure Output	Loops, DBMS_OUTPUT.PUT_LINE, conditionalss
