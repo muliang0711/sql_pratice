@@ -1,0 +1,7 @@
+open cursor loop :
+    fetch product code from product : 
+        nested cursor loop(productCode) : 
+            -- Calculate all the margin that make by that productCode store inside the product_margin : 
+            -- formula = quantity * product.buyprice 
+            -- Also put the inside the total margin(sum) : 
+            -- V_totalmargin = sum(eachorderdetails.priceEach)
