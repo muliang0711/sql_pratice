@@ -1,11 +1,71 @@
-open a cusor loop : 
-    fetch the order where the max(reqDate) < cuurentDate - 6 months :
-        if found : nested cursor(V_customerNo) 
-            fetch customer data : select * from customer where customerNo = V_customerNo 
-            end cursor
+Question : Produce a report to show all customers whose last order was more than 6 months ago (i.e. have not been active for the last 6 months). Indicate the value of their last order.
 
-            cursor (V_orderNo) : 
-                fetch orderDetails.* where orderNo = V_orderNo 
-                    -- here we already get the last order value 
-            end cursor 
-end cursor
+Solution : 
+SET SERVEROUTPUT ON;
+
+CREATE OR REPLACE PROCEDURE prc_inactive_customers_last_order IS
+
+    -- Cursor 1: All customers
+    CURSOR cur_customers IS
+        SELECT * FROM customers;
+
+    -- Row variable for customer
+    rec_customer cur_customers%ROWTYPE;
+
+    -- Cursor 2: Latest order for given customer
+    CURSOR cur_latest_order(p_customerNo customers.customerNumber%TYPE) IS
+        SELECT * FROM orders
+        WHERE customerNumber = p_customerNo
+        ORDER BY orderDate DESC
+        FETCH FIRST 1 ROW ONLY;
+
+    rec_order cur_latest_order%ROWTYPE;
+
+    -- Cursor 3: Get order total value for the last order
+    CURSOR cur_order_value(p_orderNo orders.orderNumber%TYPE) IS
+        SELECT SUM(quantityOrdered * priceEach) AS totalValue
+        FROM orderdetails
+        WHERE orderNumber = p_orderNo;
+
+    v_totalValue NUMBER;
+
+BEGIN
+    DBMS_OUTPUT.PUT_LINE('Inactive Customers Report (No Orders in Last 6 Months)');
+    DBMS_OUTPUT.PUT_LINE('---------------------------------------------------------');
+
+    OPEN cur_customers;
+    LOOP
+        FETCH cur_customers INTO rec_customer;
+        EXIT WHEN cur_customers%NOTFOUND;
+
+        -- Get latest order for this customer
+        OPEN cur_latest_order(rec_customer.customerNumber);
+        FETCH cur_latest_order INTO rec_order;
+        
+        IF cur_latest_order%FOUND THEN
+            -- Check if it's older than 6 months
+            IF rec_order.orderDate < ADD_MONTHS(SYSDATE, -6) THEN
+
+                -- Get the total value of this last order
+                OPEN cur_order_value(rec_order.orderNumber);
+                FETCH cur_order_value INTO v_totalValue;
+                CLOSE cur_order_value;
+
+                -- Print customer info and order summary
+                DBMS_OUTPUT.PUT_LINE(
+                    'Customer: ' || rec_customer.customerName || 
+                    ' | Last Order Date: ' || TO_CHAR(rec_order.orderDate, 'YYYY-MM-DD') ||
+                    ' | Order Value: $' || TO_CHAR(NVL(v_totalValue, 0), '9999.99')
+                );
+            END IF;
+        END IF;
+
+        CLOSE cur_latest_order;
+    END LOOP;
+    CLOSE cur_customers;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Error: ' || SQLERRM);
+END;
+/
