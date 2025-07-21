@@ -1,4 +1,7 @@
-question 2 Ans : 
+Question : Write a procedure to list all order details for each order for a particular date range of OrderDate.
+Calculate and print the total value of all the orders for that date range.
+
+Solution : 
 
 %rowType version : 
 CREATE OR REPLACE PROCEDURE prc_nested_cursor_rowtype (

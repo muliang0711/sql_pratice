@@ -1,0 +1,11 @@
+open a cusor loop : 
+    fetch the order where the max(reqDate) < cuurentDate - 6 months :
+        if found : nested cursor(V_customerNo) 
+            fetch customer data : select * from customer where customerNo = V_customerNo 
+            end cursor
+
+            cursor (V_orderNo) : 
+                fetch orderDetails.* where orderNo = V_orderNo 
+                    -- here we already get the last order value 
+            end cursor 
+end cursor
